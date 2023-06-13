@@ -20,7 +20,7 @@ func main() {
 		// Create the JSESSIONID cookie object
 		cookie := &http.Cookie{
 			Name:  "JSESSIONID",
-			Value: "58C557BF13E7954202E8FF460DE08351",
+			Value: "B79F26300BB44F22BEB0C5C1846B0028",
 			Path:  "/",
 		}
 		// Add the cookie to the request
@@ -61,5 +61,5 @@ func getHost(u *url.URL) string {
 // "curl --user jogh275022 https://jira.elektrobit.com/rest/api/latest/issue/RAPTOR-1 -i | grep JSESSIONID"
 // to get the session cookie to be hardcoded
 
-// Test after hardcoding the cookie with "curl https://jira.elektrobit.com/rest/api/latest/issue/RAPTOR-1 -i --proxy http://localhost:8080"
+// Test after hardcoding the cookie with "curl http://jira.elektrobit.com/rest/api/latest/issue/RAPTOR-1 -i --proxy http://localhost:8080"
 // Status code 401, still needs authentication

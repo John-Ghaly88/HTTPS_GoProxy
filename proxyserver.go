@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 
 	"gopkg.in/elazarl/goproxy.v1"
@@ -15,15 +16,17 @@ import (
 func main() {
 	proxy := goproxy.NewProxyHttpServer()
 
-	// Add a handler to modify the requests
+	// Add a handler to modify the HTTP requests
 	proxy.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+		log.Printf("The HTTP OnRequest func was executed")
+
 		log.Printf("Request received: %v", req.URL)
 
 		// Hardcoding the cookie
 		// Create the JSESSIONID cookie object
 		cookie := &http.Cookie{
 			Name:  "JSESSIONID",
-			Value: "B79F26300BB44F22BEB0C5C1846B0028",
+			Value: "0DE065DED373AD78064BED9FC744B416", //Update with the cookie value
 			Path:  "/",
 		}
 		// Add the cookie to the request
@@ -32,8 +35,10 @@ func main() {
 		return req, nil
 	})
 
-	// Add a handler to modify the responses
+	// Add a handler to modify the HTTP responses
 	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+		log.Printf("The HTTP OnResponse func was executed")
+
 		// Print the hostnames of the requested URLs
 		host := getHost(resp.Request.URL)
 		log.Printf("Response received for %v: %v", host, resp.Status)
@@ -46,11 +51,11 @@ func main() {
 		return resp
 	})
 
-	// TLS configuration for accepting https connections
-	certFile := "/path/to/certificate.crt" // Update with your certificate file path
-	keyFile := "/path/to/privatekey.key"   // Update with your private key file path
+	// TLS configuration for accepting HTTPS connections
+	certFile := "certificate.crt" // Update with your certificate file path
+	keyFile := "private.key"      // Update with your private key file path
 
-	// 	Manually load the SSL certificate and private key
+	// Manually load the SSL certificate and private key
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		log.Fatalf("Failed to load certificate and private key: %v", err)
@@ -76,6 +81,47 @@ func main() {
 		},
 	}
 
+	// Set the CONNECT handler to handle HTTPS connections
+	proxy.ConnectDial = func(network, addr string) (net.Conn, error) {
+		return transport.DialContext(context.Background(), network, addr)
+	}
+
+	// Add a handler to modify the HTTPS requests
+	proxy.OnRequest(goproxy.ReqHostMatches(regexp.MustCompile(".*"))).HandleConnectFunc(
+		func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
+			log.Printf("The HTTPS OnRequest func was executed")
+
+			// Get the CONNECT request
+			req := ctx.Req
+
+			// Add the JSESSIONID cookie to the CONNECT request headers
+			cookie := &http.Cookie{
+				Name:  "JSESSIONID",
+				Value: "0DE065DED373AD78064BED9FC744B416", //Update with the cookie value
+				Path:  "/",
+			}
+			req.AddCookie(cookie)
+
+			return goproxy.OkConnect, host
+		},
+	)
+
+	// Add a handler to modify the HTTPS responses
+	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+		log.Printf("The HTTPS OnResponse func was executed")
+
+		// Print the hostnames of the requested URLs
+		host := getHost(resp.Request.URL)
+		log.Printf("Response received for CONNECT %v: %v", host, resp.Status)
+
+		// Check for cookies in the response and print them
+		for _, cookie := range resp.Cookies() {
+			log.Printf("Cookie received from CONNECT %v: %v", host, cookie)
+		}
+
+		return resp
+	})
+
 	proxy.Verbose = true
 	proxy.Tr = transport
 
@@ -90,17 +136,14 @@ func getHost(u *url.URL) string {
 	return ""
 }
 
-// Run 2 terminals, "go run proxyserver.go" to run this proxy,
-// and the other "curl google.de -L --proxy http://localhost:8080" to use this proxy to send http requests.
-
-// To use the proxy with a cookie:
-// 1- Use this cmd to get the session cookie, then hardcode it
-// "curl --user jogh275022 https://jira.elektrobit.com/rest/api/latest/issue/RAPTOR-1 -i | grep JSESSIONID"
-// 2- Test after hardcoding the cookie with this cmd
-// "curl http://jira.elektrobit.com/rest/api/latest/issue/RAPTOR-1 -i --proxy http://localhost:8080"
-
-// To use the proxy with https:
+// To use this proxy
 // 1- Replace /path/to/certificate.crt and /path/to/privatekey.key in the code with the actual paths to your certificate and private key files.
-// 2- Use this cmd "curl https://jira.elektrobit.com/rest/api/latest/issue/RAPTOR-1 -i --proxy https://localhost:8080 --proxy-insecure"
-// The --proxy-insecure flag is necessary because your proxy server is using a self-signed certificate, and cURL will reject it by default,
-// In a production setup, you should use a valid SSL certificate signed by a trusted certificate authority, and remove this flag.
+
+// 2- Use this cmd to get the session cookie, then hardcode it and save
+// "curl --user jogh275022 https://jira.elektrobit.com/rest/api/latest/issue/RAPTOR-1 -i | grep JSESSIONID"
+
+// 3- Run the proxy using this cmd "go run proxyserver.go"
+
+// 4- Test with this cmd "curl https://google.de -L --proxy http://localhost:8080"
+
+// 5- Use this cmd "curl https://jira.elektrobit.com/rest/api/latest/issue/RAPTOR-1 -i --proxy http://localhost:8080"

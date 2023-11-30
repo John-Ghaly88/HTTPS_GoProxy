@@ -139,8 +139,7 @@ func getHost(u *url.URL) string {
 // To use this proxy
 // 1- Replace /path/to/certificate.crt and /path/to/privatekey.key in the code with the actual paths to your certificate and private key files.
 
-// 2- Use this cmd to get the session cookie, then hardcode it and save
-// "curl --user jogh275022 https://jira.elektrobit.com/rest/api/latest/issue/RAPTOR-1 -i | grep JSESSIONID"
+// 2- Get the session cookie, then hardcode it and save
 
 // 3- Run the proxy using this cmd "go run proxyserver.go"
 
